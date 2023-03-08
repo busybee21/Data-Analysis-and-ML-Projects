@@ -1,0 +1,145 @@
+---
+title: "Top 15 US Storm Events With Greater Consequences"
+author: "Snehadrita Das"
+output: html_document
+---
+
+## *Synopsis*  
+
+The basic goal of this report is to explore the NOAA Storm Database and answer some basic questions about severe weather events with certain consequences regarding the Population Health and Economy. We have taken into consideration the data from 1950 to 2011 (omitting the unrecorded data) and variables that are in connection with Health and Economy. The analysis investigation focuses on *fatalities*,*injuries*,*property and crop damage* which are key concerns for Government.  
+In our analysis we see that storm event type *TORNADO* causes greatest consequences in Population Health and event types like *FLOOD*, *HURRICANE/TYPHOON*, *TORNADO* and *STORM SURGE* causes a lot of property damage.  
+
+## *Data Processing*  
+
+### *Data Loading and EDA*  
+
+* We load the storm data for our analysis and do some exploratory data analysis.  
+
+```{r cache=TRUE}
+url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+destfile<-"C:/Users/Hp/Desktop/stormdata.csv.bz2"
+download.file(url,destfile)  ## Downloading the data 
+
+stormdata<-read.csv("stormdata.csv.bz2")  ## reading the data 
+
+head(stormdata)  ## EDA
+str(stormdata)
+dim(stormdata)
+```
+
+### *Justification and data transformation*  
+
+* We see that this dataset consists of a large number of observations and columns as well and this might take up some time and complications during furthur analysis procedure.   
+
+* So we filter the data set, remove the observations with unrecorded data or missing values and only keep those variables which are related to Health and Economy.  
+
+### *Transforming/Filtering the dataset*  
+
+```{r}
+library(dplyr)
+
+storm.data<- stormdata %>% 
+select(c("BGN_DATE","STATE","EVTYPE","FATALITIES","INJURIES", "PROPDMG","PROPDMGEXP","CROPDMG", "CROPDMGEXP")) %>%filter(INJURIES>0 | FATALITIES>0 | PROPDMG>0 | CROPDMG>0)
+
+dim(storm.data)  ## dimension of the new subsetted dataset
+sum(is.na(storm.data))  ## looking for any NA values
+
+```
+
+### *Dealing with Exponenets*  
+
+These variables are associated with PROPDMGEXP and CROPDMGEXP which are used as exponents to interpret the numeric values for the damage. The informations regarding the interpretations are in the documentation of the database.   
+
+```{r cache=TRUE}
+unique(storm.data$PROPDMGEXP)  ## looking for unique strings in property damage exponent
+unique(storm.data$CROPDMGEXP)  ## looking for unique strings in crop damage exponent
+
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP==""]<-10^0  ## assigning numeric values
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="+"]<-10^0
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="-"]<-10^0
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="0"]<-10^0
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="?"]<-10^0
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="1"]<-10^1
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="2"]<-10^2
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="3"]<-10^3
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="4"]<-10^4
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="5"]<-10^5
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="6"]<-10^6
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="7"]<-10^7
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="8"]<-10^8
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="h"]<-10^2
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="H"]<-10^2
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="K"]<-10^3
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="m"]<-10^6
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="M"]<-10^6
+storm.data$PROPDMGEXP[storm.data$PROPDMGEXP=="B"]<-10^9
+
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP==""]<-10^0
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="?"]<-10^0
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="0"]<-10^0
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="2"]<-10^2
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="k"]<-10^3
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="K"]<-10^3
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="m"]<-10^6
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="M"]<-10^6
+storm.data$CROPDMGEXP[storm.data$CROPDMGEXP=="B"]<-10^9
+
+storm.data$PROPDMGEXP<-as.numeric(storm.data$PROPDMGEXP)
+storm.data$CROPDMGEXP<-as.numeric(storm.data$CROPDMGEXP)
+```
+
+## *Results*  
+
+### *Storm Event consequences in Population Health*  
+
+* We shall calculate the event type wise total number of injuries and fatalities and look for the top 15 events with greater consequences.   
+
+```{r}
+## Grouped total injuries and fatalities 
+harm.in.health<- storm.data %>% group_by(EVTYPE) %>% 
+     summarise(total.fatality=sum(FATALITIES),total.injury=sum(INJURIES),total.harm=sum(FATALITIES)+sum(INJURIES))
+
+## arranging the dataset from lager to smaller value of total harm/injuries
+harm.in.health<-arrange(harm.in.health,desc(total.harm)) 
+
+## Considering top 15 events
+harm.in.health<-harm.in.health[1:15,]
+
+library(ggplot2)
+
+g<-ggplot(harm.in.health,aes(x=EVTYPE,y=total.harm))
+g<- g + geom_bar(stat="identity",aes(fill=EVTYPE))
+g<- g + ggtitle("Barplot showing 15 Storm events causing Most Harm in Population Health")
+g<-g + ylab("Total Harm/Injuries")
+g<-g + xlab("Top 15 Storm Events")
+g
+```
+
+### *Storm Event consequences in Economy*  
+
+* We shall calculate the event type wise total number of crop and property damage and look for the top 15 events with greater consequences.   
+
+```{r}
+## grouped total damage
+harm.in.econ<- storm.data %>% 
+     mutate(crop.damage=CROPDMG*CROPDMGEXP,prop.damage=PROPDMG*PROPDMGEXP) %>% group_by(EVTYPE) %>%
+     summarise(total.crop.damage=sum(crop.damage),
+               total.prop.damage=sum(prop.damage),total.damage=total.crop.damage+total.prop.damage)
+
+## arranging the dataset from lager to smaller value of total damage
+harm.in.econ<-arrange(harm.in.econ,desc(total.damage))
+
+## Considering top 15 events
+harm.in.econ<-harm.in.econ[1:15,]
+
+
+g<-ggplot(harm.in.econ,aes(x=EVTYPE,y=total.damage))
+g<- g + geom_bar(stat="identity",aes(fill=EVTYPE),position = "dodge")
+g<- g + ggtitle("Barplot showing 15 Storm events causing Most Harm in Economy")
+g<-g+ ylab("Total Damage in Cost") + xlab("Top 15 Storm Events")
+g
+```
+
+### *Conclusion*  
+
+In our analysis we see that storm event type *TORNADO* causes greatest consequences in Population Health and event types like *FLOOD*, *HURRICANE/TYPHOON*, *TORNADO* and *STORM SURGE* causes a lot of property damage.  
